@@ -1,0 +1,14 @@
+{
+  "_nota": "Base SIMULADA que reemplaza la API de SAP PM en el prototipo. Estos datos exactos NO se vectorizan: se consultan por herramienta (seccion 3.1 del informe).",
+  "equipos": {
+    "CAEX-14": {"descripcion": "Camión de extracción N° 14", "modelo": "CAEX-930", "area": "mina"},
+    "CAEX-07": {"descripcion": "Camión de extracción N° 7", "modelo": "CAEX-930", "area": "mina"},
+    "CHANC-01": {"descripcion": "Chancador primario", "modelo": "CH-60", "area": "planta"}
+  },
+  "ordenes_trabajo": [
+    {"ot": "OT-47102", "equipo": "CAEX-14", "fecha": "2026-02-11", "sintoma": "Alarma de presión de aceite de motor", "causa": "Sensor de presión defectuoso", "accion": "Reemplazo de sensor", "horas_detencion": 3.5},
+    {"ot": "OT-48219", "equipo": "CAEX-14", "fecha": "2026-07-14", "sintoma": "Alta temperatura de refrigerante", "causa": "Aletas del radiador obstruidas por polvo", "accion": "Limpieza de radiador y cambio de correa del ventilador", "horas_detencion": 6.0},
+    {"ot": "OT-48877", "equipo": "CAEX-07", "fecha": "2026-08-02", "sintoma": "Fuga hidráulica en cilindro de levante", "causa": "Sello dañado", "accion": "Cambio de sellos", "horas_detencion": 8.0},
+    {"ot": "OT-49010", "equipo": "CHANC-01", "fecha": "2026-08-20", "sintoma": "Vibración excesiva", "causa": "Rodamiento con desgaste", "accion": "Cambio de rodamiento", "horas_detencion": 12.0}
+  ]
+}

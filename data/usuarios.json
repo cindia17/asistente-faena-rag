@@ -1,0 +1,13 @@
+{
+  "_nota": "Usuarios SIMULADOS. En producción el token proviene del SSO corporativo (RNF-05).",
+  "tokens": {
+    "tok-mecanico-mina": {"usuario": "mecanico.mina", "rol": "mecanico", "areas": ["mina"]},
+    "tok-supervisor": {"usuario": "supervisor.turno", "rol": "supervisor", "areas": ["mina", "planta"]},
+    "tok-contratista": {"usuario": "contratista.ext", "rol": "contratista", "areas": []}
+  },
+  "permisos_por_rol": {
+    "mecanico": ["leer_documentos", "leer_historial", "crear_reporte"],
+    "supervisor": ["leer_documentos", "leer_historial", "crear_reporte", "ver_trazas"],
+    "contratista": ["leer_documentos", "crear_reporte"]
+  }
+}

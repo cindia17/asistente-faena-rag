@@ -1,0 +1,19 @@
+# Entorno y caches de Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Índices y trazas generados al ejecutar
+data/indice/
+data/*.sqlite
+trazas/
+*.log
+
+# Archivos temporales de Office
+~$*
+
+# Documentos originales (solo se versiona la versión corregida)
+*(original).docx
+*(original).pptx
