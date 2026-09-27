@@ -18,6 +18,8 @@ Qué se cambió en el proyecto, por qué y en qué archivos. El equipo (Cindia M
 | Al final de 5.1 se agregó una frase que remite al nuevo **Anexo B. Resultados del prototipo** (tabla con métrica, meta, primera evaluación y resultado final). | El informe no mostraba los resultados medidos del prototipo; es evidencia que respalda el diseño (IE5). Se dejó en un anexo para que el cuerpo siga dentro de las 5 páginas. |
 | En la tabla 5.2, fila "Conectividad", se agregó: "si el modelo no responde, respuesta con citas textuales". | Ahora está implementado en el prototipo (ver Código). |
 
+**Aportes del equipo integrados al informe** (escritos por Cindia e Isaac en su copia de trabajo): reflexiones individuales 6.1 y 6.2; tilde en "Cristian Andrés"; OE1 "Hoy: 0 %"; "antepón" en la regla 5 del prompt; fila "Conectividad" de 5.2 (modelo ligero en talleres y el de 70B centralizado); referencias de Chen et al. (2024), Es et al. (2024) y Gao et al. (2023) actualizadas con DOI. Como no se usaron otras herramientas de IA, se quitó la línea pendiente del Anexo A. El informe ya no tiene textos pendientes.
+
 No se modificaron el análisis del caso, las justificaciones técnicas, las conclusiones ni las reflexiones individuales (la pauta prohíbe usar IA en ellas).
 
 ### Código (fallas lógicas corregidas)
