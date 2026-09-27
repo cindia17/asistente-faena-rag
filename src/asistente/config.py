@@ -26,6 +26,8 @@ MODELO_VERIFICADOR = os.getenv("MODELO_VERIFICADOR", MODELO_GENERADOR)
 # determinista (sin LLM), útil para pruebas automatizadas y equipos sin recursos.
 MODO_LLM = os.getenv("MODO_LLM", "auto")          # auto | ollama | offline
 MODO_EMBEDDINGS = os.getenv("MODO_EMBEDDINGS", "auto")  # auto | ollama | hashing
+# Segundos de espera al LLM; si no responde, se usa el generador extractivo (RNF-03).
+TIMEOUT_LLM = float(os.getenv("TIMEOUT_LLM", "300"))
 
 # --- Recuperación (sección 3.3 del informe) ----------------------------------
 CANDIDATOS_POR_INDICE = 20   # candidatos que trae BM25 y la búsqueda densa

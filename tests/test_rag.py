@@ -100,3 +100,27 @@ def test_verificador_rechaza_contenido_ajeno_a_la_cita(asistente):
     f = _frag(asistente, "PETS-SEG-001")
     v = Verificador().verificar(f"1. El aceite hidráulico se cambia cada 2000 horas. {cita(f)}", [f])
     assert v["veredicto"] == "SIN_RESPALDO"
+
+
+# ---------------------------------------------------------------- Robustez (RNF-03)
+class _LLMCaido:
+    modelo = "caido"
+
+    def chat(self, *args, **kwargs):
+        import requests
+        raise requests.Timeout("el modelo no respondió")
+
+    def chat_json(self, *args, **kwargs):
+        return {}
+
+
+def test_llm_sin_respuesta_usa_generador_extractivo(asistente):
+    original = asistente.llm
+    asistente.llm = _LLMCaido()
+    try:
+        r = asistente.consultar(PREGUNTA_EJEMPLO, MECANICO, MemoriaSesion())
+    finally:
+        asistente.llm = original
+    assert not r["abstencion"] and r["generador"] == "extractivo"
+    assert "no respondió a tiempo" in r["respuesta"]
+    assert "OT-48219" in r["respuesta"]

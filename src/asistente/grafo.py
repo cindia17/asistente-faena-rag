@@ -18,6 +18,7 @@ import uuid
 from datetime import datetime
 from typing import Any, TypedDict
 
+import requests
 from langgraph.graph import END, START, StateGraph
 
 from . import config, trazas
@@ -139,15 +140,22 @@ class AsistenteFaena:
         t0 = time.perf_counter()
         requiere_bloqueo = e["intencion"] in ("mixta", "mantenimiento")
         # Primer intento con LLM (si hay); el reintento usa el generador extractivo.
+        borrador, avisos = None, list(e.get("avisos", []))
         if self.llm is not None and e.get("intentos", 0) == 0:
-            borrador = generar_con_llm(self.llm, e["intencion"], e["pregunta_limpia"], e["fragmentos"],
-                                       e.get("historial"), e["memoria"].como_texto())
-            generador = f"llm:{self.llm.modelo}"
-        else:
+            try:
+                borrador = generar_con_llm(self.llm, e["intencion"], e["pregunta_limpia"], e["fragmentos"],
+                                           e.get("historial"), e["memoria"].como_texto())
+                generador = f"llm:{self.llm.modelo}"
+            except requests.RequestException:
+                # RNF-03: si el modelo no responde (caído o saturado), la consulta no se
+                # cae: se responde con el generador extractivo, que es fiel por construcción.
+                avisos.append("Atención: el modelo de lenguaje no respondió a tiempo; "
+                              "la respuesta se arma con citas textuales de los documentos.")
+        if borrador is None:
             borrador = generar_extractivo(e["consulta"], e["fragmentos"], e.get("historial"), requiere_bloqueo)
             generador = "extractivo"
         return {"borrador": borrador, "generador": generador, "intentos": e.get("intentos", 0) + 1,
-                "tiempos": self._medir(e, f"generacion_{e.get('intentos', 0) + 1}", t0)}
+                "avisos": avisos, "tiempos": self._medir(e, f"generacion_{e.get('intentos', 0) + 1}", t0)}
 
     def n_verificacion(self, e: Estado) -> dict:
         t0 = time.perf_counter()

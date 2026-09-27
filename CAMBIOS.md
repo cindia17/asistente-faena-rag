@@ -59,10 +59,16 @@ La primera evaluación offline (`python eval/evaluar.py --offline`, 26 preguntas
 
 Resultado después de corregir: **26 de 26 casos correctos** y todas las metas cumplidas (fidelidad 1,0; recall@5 1,0; abstención correcta 1,0; resistencia a manipulación 1,0; 0 usos de revisiones superadas; latencia p95 7,0 s < 8 s). Las 32 pruebas siguen pasando.
 
+### Error detectado al evaluar con el LLM y cómo se corrigió
+
+| Qué pasó | Causa | Corrección |
+|---|---|---|
+| La evaluación con el LLM local se detuvo con `ReadTimeout`: el modelo no respondió en 300 s y **toda la consulta se cayó con un error** (lo mismo habría pasado en la demo). | `generar_con_llm` no manejaba el caso de que Ollama no respondiera (caído o saturado por otro proceso). | Si el LLM no responde, la respuesta se arma con el generador extractivo y se avisa al usuario (`grafo.py`), en línea con RNF-03 (conectividad limitada). El tiempo de espera ahora es configurable con `TIMEOUT_LLM` (`config.py`, `llm.py`). Nueva prueba: `test_llm_sin_respuesta_usa_generador_extractivo`. Resultado: **33 de 33 pruebas pasan**. |
+
 ### Evidencias (`evidencias/`)
 
 Carpeta nueva, como pide la pauta ("evidencia de pruebas de software realizadas"):
 
-- `pruebas_pytest.txt`: salida de `pytest -v` (32/32).
+- `pruebas_pytest.txt`: salida de `pytest -v` (33/33).
 - `evaluacion_offline.txt` / `.json`: métricas sobre el conjunto de preguntas de prueba sin LLM (generador extractivo).
 - `evaluacion_llm.txt` / `.json`: las mismas métricas con el LLM local (qwen3.5:0.8b en Ollama).

@@ -29,7 +29,7 @@ class OllamaLLM:
         }
         if formato_json:
             cuerpo["format"] = "json"
-        r = requests.post(f"{config.OLLAMA_URL}/api/chat", json=cuerpo, timeout=300)
+        r = requests.post(f"{config.OLLAMA_URL}/api/chat", json=cuerpo, timeout=config.TIMEOUT_LLM)
         r.raise_for_status()
         texto = r.json()["message"]["content"]
         return re.sub(r"<think>.*?</think>", "", texto, flags=re.DOTALL).strip()
