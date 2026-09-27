@@ -18,3 +18,4 @@ data/reportes_registrados.jsonl
 # Documentos originales (solo se versiona la versión corregida)
 *(original).docx
 *(original).pptx
+*.egg-info/

@@ -1,5 +1,0 @@
-Metadata-Version: 2.4
-Name: asistente-faena
-Version: 0.1.0
-Summary: Asistente de faena con LLM, RAG y agentes (prototipo académico, caso Codelco Chuquicamata)
-Requires-Python: >=3.10
