@@ -37,6 +37,14 @@ _PALABRAS = {
     "procedimientos": r"\b(procedimiento|bloque|epp|ds ?132|reglamento|norma|permiso|seguridad|candado|riesgo|primeros auxilios|ingest|ingier|piel|capacitaci|energia|accident|lesion|autoriz)\w*",
 }
 _INTERVENCION = r"\b(revis|interven|cambi|reparar|desmont|abrir|limpi)\w*"
+# R5 (bloqueo primero) aplica cuando alguien va a tocar el equipo, no ante cualquier
+# consulta de mantenimiento (p. ej. primeros auxilios o qué refrigerante se usa).
+_TOCA_EQUIPO = r"\b(revis|interven|cambi|reparar|desmont|abrir|limpi|inspecc|diagnos|tocar|bloque)\w*"
+_SALUDO = r"^\W*(hola|buen[oa]s?( dias| tardes| noches)?|hey|saludos|gracias|ayuda|que puedes hacer|quien eres)\b"
+
+
+def implica_intervencion(pregunta: str, intencion: str) -> bool:
+    return intencion in ("mixta", "mantenimiento") and bool(re.search(_TOCA_EQUIPO, sin_tildes(pregunta.lower())))
 
 
 def clasificar_intencion(pregunta: str) -> str:
@@ -45,6 +53,8 @@ def clasificar_intencion(pregunta: str) -> str:
         return "reporte"
     mant = bool(re.search(_PALABRAS["mantenimiento"], t))
     proc = bool(re.search(_PALABRAS["procedimientos"], t))
+    if not (mant or proc) and re.search(_SALUDO, t):
+        return "saludo"
     if mant and (proc or re.search(_INTERVENCION, t)):
         return "mixta"
     if mant:
@@ -185,6 +195,17 @@ def generar_con_llm(llm, agente: str, pregunta: str, fragmentos: list[dict], his
 def mensaje_abstencion(intencion: str) -> str:
     return f"{config.FRASE_ABSTENCION}. {ESCALAR_A.get(intencion, ESCALAR_A['fuera_de_alcance'])}"
 
+
+MENSAJE_BIENVENIDA = (
+    "Hola, soy el Asistente de Faena. Respondo con citas de los procedimientos (PETS), el DS 132, "
+    "los manuales del fabricante y el historial de SAP PM. Por ejemplo, puedes preguntarme:\n"
+    "- El camión 14 marca alta temperatura. ¿Qué reviso primero?\n"
+    "- ¿Quién puede retirar un candado de bloqueo?\n"
+    "- ¿Qué EPP uso para manipular refrigerante?\n"
+    "- ¿Qué fallas ha tenido el camión 14?\n"
+    "- Quiero reportar un cuasi accidente.\n"
+    "Si no tengo respaldo documental, te lo digo y te indico a quién consultar."
+)
 
 NOTA_SUPERVISOR = ("Nota: el asistente no autoriza intervenciones. El supervisor de turno debe verificar "
                    "el bloqueo y autorizar el inicio del trabajo.")

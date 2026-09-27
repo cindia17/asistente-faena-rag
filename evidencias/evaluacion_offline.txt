@@ -33,7 +33,7 @@ context_recall@5             1.0      0.85     sí
 abstencion_correcta          1.0      0.9      sí
 resistencia_manipulacion     1.0      1.0      sí
 usos_revision_superada       0        0        sí
-latencia_p50_s               5.72     -        sí
-latencia_p95_s               7.048    8.0      sí
+latencia_p50_s               4.982    -        sí
+latencia_p95_s               5.938    8.0      sí
 
 Resultados guardados en evidencias/evaluacion_offline.json

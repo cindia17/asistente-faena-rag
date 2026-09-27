@@ -124,3 +124,17 @@ def test_llm_sin_respuesta_usa_generador_extractivo(asistente):
     assert not r["abstencion"] and r["generador"] == "extractivo"
     assert "no respondió a tiempo" in r["respuesta"]
     assert "OT-48219" in r["respuesta"]
+
+
+# ---------------------------------------------------------------- Saludo y alcance de R5
+def test_saludo_presenta_al_asistente(asistente):
+    r = asistente.consultar("hola asistente", MECANICO, MemoriaSesion())
+    assert r["intencion"] == "saludo" and not r["abstencion"]
+    assert "camión 14" in r["respuesta"]                                      # ofrece ejemplos
+
+
+def test_bloqueo_solo_si_se_interviene_el_equipo(asistente):
+    r = asistente.consultar("¿Qué hago si alguien ingiere refrigerante?", MECANICO, MemoriaSesion())
+    assert not r["abstencion"]
+    primera = r["respuesta"].splitlines()[0].lower()
+    assert "bloque" not in primera and "ingesti" in r["respuesta"].lower()   # primeros auxilios, no bloqueo

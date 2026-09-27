@@ -22,9 +22,9 @@ import requests
 from langgraph.graph import END, START, StateGraph
 
 from . import config, trazas
-from .agentes import (NOTA_SUPERVISOR, TIPOS_POR_AGENTE, borrador_reporte, clasificar_intencion,
+from .agentes import (MENSAJE_BIENVENIDA, NOTA_SUPERVISOR, TIPOS_POR_AGENTE, borrador_reporte, clasificar_intencion,
                       evaluar_respondibilidad, generar_con_llm, generar_extractivo, mensaje_abstencion,
-                      pide_historial)
+                      implica_intervencion, pide_historial)
 from .contexto import MemoriaSesion, reescribir_consulta
 from .embeddings import crear_embedder
 from .guardrails import revisar_entrada
@@ -48,6 +48,7 @@ class Estado(TypedDict, total=False):
     equipo_tipo: str | None
     hereda_contexto: bool
     intencion: str
+    interviene: bool
     fragmentos: list[dict]
     detalle_recuperacion: list[dict]
     mejor_puntaje: float
@@ -98,7 +99,11 @@ class AsistenteFaena:
         return {**r, "tiempos": self._medir(e, "reescritura", t0)}
 
     def n_clasificacion(self, e: Estado) -> dict:
-        return {"intencion": clasificar_intencion(e["consulta"])}
+        intencion = clasificar_intencion(e["consulta"])
+        return {"intencion": intencion, "interviene": implica_intervencion(e["consulta"], intencion)}
+
+    def n_saludo(self, e: Estado) -> dict:
+        return {"respuesta": MENSAJE_BIENVENIDA, "abstencion": False, "citas": []}
 
     def n_reporte(self, e: Estado) -> dict:
         b = borrador_reporte(e["pregunta_limpia"], e.get("equipo"), self.llm)
@@ -114,7 +119,7 @@ class AsistenteFaena:
         fragmentos, detalle = res.fragmentos, res.detalle
         # Restricción de dominio (R5): si la consulta implica intervenir, se asegura
         # que el procedimiento de bloqueo esté en el contexto.
-        if intencion in ("mixta", "mantenimiento") and not any("bloque" in f["texto"].lower() for f in fragmentos):
+        if e.get("interviene") and not any("bloque" in f["texto"].lower() for f in fragmentos):
             extra = self.recuperador.buscar("bloqueo de energías antes de intervenir el equipo",
                                             tipos={"procedimiento"}, equipo_tipo=e.get("equipo_tipo"), top_k=1)
             if extra.fragmentos:
@@ -138,7 +143,7 @@ class AsistenteFaena:
 
     def n_generacion(self, e: Estado) -> dict:
         t0 = time.perf_counter()
-        requiere_bloqueo = e["intencion"] in ("mixta", "mantenimiento")
+        requiere_bloqueo = e.get("interviene", False)
         # Primer intento con LLM (si hay); el reintento usa el generador extractivo.
         borrador, avisos = None, list(e.get("avisos", []))
         if self.llm is not None and e.get("intentos", 0) == 0:
@@ -164,7 +169,7 @@ class AsistenteFaena:
 
     def n_respuesta(self, e: Estado) -> dict:
         partes = list(e.get("avisos", [])) + [e["borrador"]]
-        if e["intencion"] in ("mixta", "mantenimiento"):
+        if e.get("interviene"):
             partes.append(NOTA_SUPERVISOR)
         citas = sorted({cita(f) for f in e["fragmentos"] if cita(f) in e["borrador"]})
         citas += sorted(set(re.findall(r"\[SAP-PM[^\]]*\]", e["borrador"])))
@@ -185,7 +190,7 @@ class AsistenteFaena:
     # ---------------------------------------------------------------- aristas
     @staticmethod
     def r_clasificacion(e: Estado) -> str:
-        return "reporte" if e["intencion"] == "reporte" else "recuperacion"
+        return e["intencion"] if e["intencion"] in ("reporte", "saludo") else "recuperacion"
 
     @staticmethod
     def r_umbral(e: Estado) -> str:
@@ -204,17 +209,17 @@ class AsistenteFaena:
 
     def _construir_grafo(self):
         g = StateGraph(Estado)
-        for nombre in ("entrada", "reescritura", "clasificacion", "reporte", "recuperacion",
+        for nombre in ("entrada", "reescritura", "clasificacion", "reporte", "saludo", "recuperacion",
                        "generacion", "verificacion", "respuesta", "abstencion"):
             g.add_node(nombre, getattr(self, f"n_{nombre}"))
         g.add_edge(START, "entrada")
         g.add_edge("entrada", "reescritura")
         g.add_edge("reescritura", "clasificacion")
-        g.add_conditional_edges("clasificacion", self.r_clasificacion, ["reporte", "recuperacion"])
+        g.add_conditional_edges("clasificacion", self.r_clasificacion, ["reporte", "saludo", "recuperacion"])
         g.add_conditional_edges("recuperacion", self.r_umbral, ["generacion", "abstencion"])
         g.add_edge("generacion", "verificacion")
         g.add_conditional_edges("verificacion", self.r_verificacion, ["respuesta", "generacion", "abstencion"])
-        for fin in ("reporte", "respuesta", "abstencion"):
+        for fin in ("reporte", "saludo", "respuesta", "abstencion"):
             g.add_edge(fin, END)
         return g.compile()
 
