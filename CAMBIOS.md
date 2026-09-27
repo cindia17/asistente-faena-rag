@@ -20,6 +20,8 @@ Qué se cambió en el proyecto, por qué y en qué archivos. El equipo (Cindia M
 
 **Aportes del equipo integrados al informe** (escritos por Cindia e Isaac en su copia de trabajo): reflexiones individuales 6.1 y 6.2; tilde en "Cristian Andrés"; OE1 "Hoy: 0 %"; "antepón" en la regla 5 del prompt; fila "Conectividad" de 5.2 (modelo ligero en talleres y el de 70B centralizado); referencias de Chen et al. (2024), Es et al. (2024) y Gao et al. (2023) actualizadas con DOI. Como no se usaron otras herramientas de IA, se quitó la línea pendiente del Anexo A. El informe ya no tiene textos pendientes.
 
+Revisión final: en 1.1, la cita "SERNAGEOMIN (2026)" pasa a "Servicio Nacional de Geología y Minería (SERNAGEOMIN, 2026)", porque en APA 7 la primera cita de un autor institucional con sigla lleva el nombre completo, que es como aparece en Referencias. Se verificó que todas las citas del texto tienen su referencia y viceversa.
+
 No se modificaron el análisis del caso, las justificaciones técnicas, las conclusiones ni las reflexiones individuales (la pauta prohíbe usar IA en ellas).
 
 ### Código (fallas lógicas corregidas)
