@@ -15,6 +15,8 @@ Qué se cambió en el proyecto, por qué y en qué archivos. El equipo (Cindia M
 | Se agregó la referencia APA de la herramienta de IA (Anthropic, 2026). | La pauta indica que todo uso de IA debe citarse según https://bibliotecas.duoc.cl/ia. |
 | Se reescribió el **Anexo A** (declaración de uso de IA): herramienta, en qué se usó, ejemplo de instrucción y cómo se validó. | La pauta pide declarar qué herramientas de IA se usaron y cómo se aplicaron. |
 | Los títulos 6.1 y 6.2 quedaron con el mismo estilo que los demás subtítulos. | Consistencia de formato. |
+| Al final de 5.1 se agregó una frase que remite al nuevo **Anexo B. Resultados del prototipo** (tabla con métrica, meta, primera evaluación y resultado final). | El informe no mostraba los resultados medidos del prototipo; es evidencia que respalda el diseño (IE5). Se dejó en un anexo para que el cuerpo siga dentro de las 5 páginas. |
+| En la tabla 5.2, fila "Conectividad", se agregó: "si el modelo no responde, respuesta con citas textuales". | Ahora está implementado en el prototipo (ver Código). |
 
 No se modificaron el análisis del caso, las justificaciones técnicas, las conclusiones ni las reflexiones individuales (la pauta prohíbe usar IA en ellas).
 
