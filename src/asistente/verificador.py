@@ -100,10 +100,10 @@ class Verificador:
         else:
             veredicto = "SIN_RESPALDO"
 
+        fidelidad = (len(afirmaciones) - len(sin_respaldo)) / len(afirmaciones) if afirmaciones else 0.0
+
         if self.llm is not None and afirmaciones:
             veredicto = self._combinar_con_llm(veredicto, respuesta, fragmentos, sin_respaldo)
-
-        fidelidad = (len(afirmaciones) - len(sin_respaldo)) / len(afirmaciones) if afirmaciones else 0.0
         return {"veredicto": veredicto, "sin_respaldo": sin_respaldo, "fidelidad": round(fidelidad, 3), "detalle": detalle}
 
     def _combinar_con_llm(self, veredicto: str, respuesta: str, fragmentos: list[dict], sin_respaldo: list[str]) -> str:
@@ -112,5 +112,5 @@ class Verificador:
         v_llm = juicio.get("veredicto", "SIN_RESPALDO")
         if v_llm not in ORDEN_VEREDICTO:
             return veredicto
-        sin_respaldo.extend(x for x in juicio.get("sin_respaldo", []) if isinstance(x, str))
+        sin_respaldo.extend(x for x in juicio.get("sin_respaldo", []) if isinstance(x, str) and x not in sin_respaldo)
         return min(veredicto, v_llm, key=ORDEN_VEREDICTO.get)

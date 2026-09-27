@@ -19,6 +19,9 @@ from . import config
 from .texto import cobertura, tokenizar
 
 BONO_PRIORIDAD = {"alta": 0.05, "media": 0.0, "baja": -0.05}
+# Si la consulta nombra el documento ("PETS-SEG-001"), ese documento debe ganar:
+# es el caso en que BM25 aporta exactitud y la similitud semántica no la ve.
+BONO_IDENTIFICADOR = 0.2
 
 
 @dataclass
@@ -73,11 +76,14 @@ class RecuperadorHibrido:
     # -- 4. Reranking ---------------------------------------------------------------
     def _rerank(self, consulta: str, q_vec: np.ndarray, candidatos: list[int]) -> list[tuple[int, float, float, float]]:
         salida = []
+        consulta_min = consulta.lower()
         for i in candidatos:
             f = self.fragmentos[i]
             semantica = float(self.embeddings[i] @ q_vec)
             cob = cobertura(consulta, f"{f['titulo']} {f['seccion']} {f['texto']}")
             puntaje = 0.6 * semantica + 0.4 * cob + BONO_PRIORIDAD.get(f["prioridad"], 0.0)
+            if f["doc_id"].lower() in consulta_min:
+                puntaje += BONO_IDENTIFICADOR
             salida.append((i, puntaje, semantica, cob))
         return sorted(salida, key=lambda t: -t[1])
 

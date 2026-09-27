@@ -131,6 +131,11 @@ def generar_extractivo(consulta: str, fragmentos: list[dict], historial: dict | 
                 lineas.append(f"{o} {cita(f)}")
                 usados.add(f["id"])
     q = set(tokenizar(consulta))
+    # El historial exacto se reserva primero para que el límite de palabras no lo deje fuera.
+    lineas_historial = [f"Historial del equipo: el {o['fecha']} registró \"{o['sintoma']}\"; "
+                        f"causa: {o['causa']}; acción: {o['accion']}. {cita_ot(o)}"
+                        for o in _ordenes_pertinentes(consulta, historial)]
+    presupuesto = config.MAX_PALABRAS - sum(len(l.split()) for l in lineas + lineas_historial)
     for f in orden:
         if f["id"] in usados or len(lineas) >= 4:
             continue
@@ -139,12 +144,27 @@ def generar_extractivo(consulta: str, fragmentos: list[dict], historial: dict | 
             continue
         if f["idioma"] == "en":
             o = f"Manual/boletín del fabricante (texto original en inglés): \"{o}\""
-        lineas.append(f"{o} {cita(f)}")
+        linea = f"{o} {cita(f)}"
+        if len(linea.split()) > presupuesto:     # R8: máximo MAX_PALABRAS
+            continue
+        presupuesto -= len(linea.split())
+        lineas.append(linea)
         usados.add(f["id"])
-    for orden_t in (historial or {}).get("ordenes", [])[:3]:
-        lineas.append(f"Historial del equipo: el {orden_t['fecha']} registró \"{orden_t['sintoma']}\"; "
-                      f"causa: {orden_t['causa']}; acción: {orden_t['accion']}. {cita_ot(orden_t)}")
+    lineas += lineas_historial
     return "\n".join(f"{i}. {l}" for i, l in enumerate(lineas, 1))
+
+
+_RE_PIDE_HISTORIAL = re.compile(r"historial|fallas? anteriores|ordenes|\bot\b|intervenciones")
+
+
+def _ordenes_pertinentes(consulta: str, historial: dict | None, maximo: int = 3) -> list[dict]:
+    """Órdenes de SAP PM que vienen al caso: todas (hasta `maximo`) si se pide el
+    historial; si no, solo las que comparten términos con la consulta."""
+    ordenes = (historial or {}).get("ordenes", [])
+    if _RE_PIDE_HISTORIAL.search(sin_tildes(consulta.lower())):
+        return ordenes[:maximo]
+    q = set(tokenizar(consulta))
+    return [o for o in ordenes if q & set(tokenizar(f"{o['sintoma']} {o['causa']}"))][:maximo]
 
 
 def generar_con_llm(llm, agente: str, pregunta: str, fragmentos: list[dict], historial: dict | None, memoria_txt: str) -> str:

@@ -115,8 +115,9 @@ class AsistenteFaena:
         if intencion in ("mixta", "mantenimiento") and not any("bloque" in f["texto"].lower() for f in fragmentos):
             extra = self.recuperador.buscar("bloqueo de energías antes de intervenir el equipo",
                                             tipos={"procedimiento"}, equipo_tipo=e.get("equipo_tipo"), top_k=1)
-            fragmentos = extra.fragmentos + fragmentos[: config.TOP_K - 1]
-            detalle = extra.detalle + detalle[: config.TOP_K - 1]
+            if extra.fragmentos:
+                fragmentos = extra.fragmentos + fragmentos[: config.TOP_K - 1]
+                detalle = extra.detalle + detalle[: config.TOP_K - 1]
         # Datos exactos: por herramienta, con el token del usuario (no se vectorizan).
         historial, avisos = None, list(e.get("avisos", []))
         if e.get("equipo") and intencion in ("mantenimiento", "mixta"):
@@ -181,7 +182,9 @@ class AsistenteFaena:
     def r_verificacion(e: Estado) -> str:
         if e["verificacion"]["veredicto"] == "RESPALDADA":
             return "respuesta"
-        if e["intentos"] <= config.MAX_REINTENTOS_VERIFICACION:
+        # Reintentar solo sirve si el borrador vino del LLM: el reintento usa el
+        # generador extractivo, y repetirlo daría exactamente el mismo texto.
+        if e["generador"].startswith("llm:") and e["intentos"] <= config.MAX_REINTENTOS_VERIFICACION:
             return "generacion"
         return "abstencion"
 

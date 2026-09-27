@@ -9,6 +9,7 @@ __pycache__/
 data/indice/
 data/*.sqlite
 trazas/
+data/reportes_registrados.jsonl
 *.log
 
 # Archivos temporales de Office

@@ -34,13 +34,15 @@ def leer_documento(ruta: Path) -> tuple[dict, str]:
 
 def segmentar(meta: dict, cuerpo: str) -> list[dict]:
     fragmentos = []
+    doc_sospechoso = False
     for bloque in re.split(r"^## ", cuerpo, flags=re.MULTILINE):
         bloque = bloque.strip()
         if not bloque:
             continue
         seccion, _, texto = bloque.partition("\n")
         texto_limpio, sospechoso = sanear_fragmento(" ".join(texto.split()))
-        if not texto_limpio:
+        doc_sospechoso |= sospechoso
+        if not texto_limpio:      # la sección era solo la orden inyectada
             continue
         fragmentos.append({
             "id": f"{meta['doc_id']}#r{meta['revision']}#{seccion.split('.')[0].strip()}",
@@ -58,6 +60,10 @@ def segmentar(meta: dict, cuerpo: str) -> list[dict]:
             "sospechoso": sospechoso,
             "texto": texto_limpio,
         })
+    # Un documento que intentó dar órdenes al modelo no es confiable en ninguna de
+    # sus secciones: se marcan todas para que quede en la traza y en el resumen.
+    for f in fragmentos:
+        f["sospechoso"] = doc_sospechoso
     return fragmentos
 
 
