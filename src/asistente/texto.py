@@ -32,6 +32,7 @@ GLOSARIO_ES_EN = {
     "aletas": "fins", "polvo": "dust", "desgaste": "wear", "tension": "tension",
     "revisar": "check inspect", "reviso": "check inspect", "cambio": "replace", "boletin": "bulletin",
     "horas": "hours", "sobretemperatura": "high temperature",
+    "mezcla": "mixture mix", "alimenta": "supplies", "sistema": "system", "ingiere": "ingestion",
 }
 
 

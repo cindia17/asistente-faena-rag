@@ -34,7 +34,7 @@ ESCALAR_A = {
 _PALABRAS = {
     "reporte": r"\b(reportar|reporte|informar un|cuasi ?accidente|incidente que|casi me|se me cay|tuve un)\b",
     "mantenimiento": r"\b(falla|fallo|alarma|temperatura|marca|diagnos|historial|aceite|correa|radiador|manual|repuesto|fuga|termostato|refrigerante|hidraulic|ventilador|revis|boletin)\w*",
-    "procedimientos": r"\b(procedimiento|bloque|epp|ds ?132|reglamento|norma|permiso|seguridad|candado|riesgo|primeros auxilios|ingest|piel|capacitaci|energia)\w*",
+    "procedimientos": r"\b(procedimiento|bloque|epp|ds ?132|reglamento|norma|permiso|seguridad|candado|riesgo|primeros auxilios|ingest|ingier|piel|capacitaci|energia|accident|lesion|autoriz)\w*",
 }
 _INTERVENCION = r"\b(revis|interven|cambi|reparar|desmont|abrir|limpi)\w*"
 
@@ -59,7 +59,8 @@ def clasificar_intencion(pregunta: str) -> str:
 # ---------------------------------------------------------------------------
 GENERICOS = set("""camion caex equipo marca alta alto bajo revis reviso revisar hacer hago cada cuanto cuanta
 numero primero debo puedo necesito quiero dime sabes uso usar segun como cambia cambiar cambio se hay tengo
-dice sobre cual cuales pasos paso antes despues trabajador mecanico""".split())
+dice sobre cual cuales pasos paso antes despues trabajador mecanico usa utiliza pasa menos partes
+alguien ocurrido tenido""".split())
 _RE_PIDE_FRECUENCIA = re.compile(r"cada cu[aá]nto|frecuencia|intervalo|cu[aá]ntas horas|cada cu[aá]ntas")
 _RE_FRECUENCIA = re.compile(r"\b(every|cada)\s+\d+|\d+\s*(horas|hours|dias|days|meses|months|km)\b|\b(daily|diari)", re.I)
 
@@ -154,14 +155,18 @@ def generar_extractivo(consulta: str, fragmentos: list[dict], historial: dict | 
     return "\n".join(f"{i}. {l}" for i, l in enumerate(lineas, 1))
 
 
-_RE_PIDE_HISTORIAL = re.compile(r"historial|fallas? anteriores|ordenes|\bot\b|intervenciones")
+_RE_PIDE_HISTORIAL = re.compile(r"historial|fallas? anteriores|ha tenido|han tenido|ordenes de trabajo|\bots?\b|intervenciones")
+
+
+def pide_historial(consulta: str) -> bool:
+    return bool(_RE_PIDE_HISTORIAL.search(sin_tildes(consulta.lower())))
 
 
 def _ordenes_pertinentes(consulta: str, historial: dict | None, maximo: int = 3) -> list[dict]:
     """Órdenes de SAP PM que vienen al caso: todas (hasta `maximo`) si se pide el
     historial; si no, solo las que comparten términos con la consulta."""
     ordenes = (historial or {}).get("ordenes", [])
-    if _RE_PIDE_HISTORIAL.search(sin_tildes(consulta.lower())):
+    if pide_historial(consulta):
         return ordenes[:maximo]
     q = set(tokenizar(consulta))
     return [o for o in ordenes if q & set(tokenizar(f"{o['sintoma']} {o['causa']}"))][:maximo]

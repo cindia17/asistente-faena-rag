@@ -22,7 +22,8 @@ from langgraph.graph import END, START, StateGraph
 
 from . import config, trazas
 from .agentes import (NOTA_SUPERVISOR, TIPOS_POR_AGENTE, borrador_reporte, clasificar_intencion,
-                      evaluar_respondibilidad, generar_con_llm, generar_extractivo, mensaje_abstencion)
+                      evaluar_respondibilidad, generar_con_llm, generar_extractivo, mensaje_abstencion,
+                      pide_historial)
 from .contexto import MemoriaSesion, reescribir_consulta
 from .embeddings import crear_embedder
 from .guardrails import revisar_entrada
@@ -125,8 +126,13 @@ class AsistenteFaena:
                 historial = consultar_historial(e["token"], e["equipo"])
             except PermisoDenegado as err:
                 avisos.append(f"Atención: no se consultó el historial de {e['equipo']}: {err}")
+        respondibilidad = evaluar_respondibilidad(e["pregunta_limpia"], fragmentos)
+        # Si se pide el historial y SAP PM lo entrega, la respuesta se respalda en ese
+        # dato exacto (herramienta), aunque ningún documento hable del equipo.
+        if historial and historial.get("ordenes") and pide_historial(e["pregunta_limpia"]):
+            respondibilidad = dict(respondibilidad, respondible=True, fuente="SAP PM")
         return {"fragmentos": fragmentos, "detalle_recuperacion": detalle, "mejor_puntaje": res.mejor_puntaje,
-                "respondibilidad": evaluar_respondibilidad(e["pregunta_limpia"], fragmentos),
+                "respondibilidad": respondibilidad,
                 "historial": historial, "avisos": avisos, "tiempos": self._medir(e, "recuperacion", t0)}
 
     def n_generacion(self, e: Estado) -> dict:
