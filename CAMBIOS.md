@@ -1,6 +1,6 @@
 # Registro de cambios
 
-Qué se cambió en el proyecto, por qué y en qué archivos. Los cambios hechos con apoyo de IA (Claude Code) se declaran también en el Anexo A del informe.
+Qué se cambió en el proyecto, por qué y en qué archivos. El equipo (Cindia Maldonado e Isaac Román) trabajó el código en conjunto con Claude Code: la herramienta se usó como apoyo para programar, ejecutar las pruebas necesarias y detectar fallas; el equipo revisó todo junto con ella e hizo sus propios cambios. Este uso de IA está declarado en el Anexo A del informe.
 
 ---
 
@@ -45,6 +45,24 @@ Las otras fallas de la tabla anterior (reintento repetido, recorte de fragmentos
 
 Después de las correcciones se borró el índice (`data/indice/`) para reconstruirlo con la nueva ingesta y se volvieron a ejecutar todas las pruebas: **32 de 32 pasan** (`pytest -v`, ver `evidencias/pruebas_pytest.txt`).
 
+### Errores detectados en la evaluación y cómo se corrigieron
+
+La primera evaluación offline (`python eval/evaluar.py --offline`, 26 preguntas) **no cumplía dos metas**: context recall@5 = 0,794 (meta 0,85) y abstención correcta = 0,75 (meta 0,90). El asistente respondía "No tengo respaldo documental" a 6 preguntas que sí tienen respuesta en el corpus.
+
+| Casos | Causa | Corrección |
+|---|---|---|
+| N03 "¿Qué hago si alguien ingiere refrigerante?", D07 "¿Qué accidentes han ocurrido con la correa…?" | El clasificador no reconocía "ingiere" ni "accidentes" como temas de seguridad. La consulta iba al agente de Mantenimiento, cuyo filtro **excluye** la hoja de seguridad y el resumen de incidentes, justo los documentos con la respuesta. | Se agregan `ingier`, `accident`, `lesion` y `autoriz` a las palabras de procedimientos (`agentes.py`). |
+| N07 "¿Quién autoriza…?" | Se clasificaba como fuera de alcance y no aparecía PETS-SEG-001 (sección Autorización). | Igual que el caso anterior (`autoriz`). |
+| D03 "¿…en qué mezcla?", D08 "¿Qué partes… alimenta el sistema hidráulico?" | El manual está en inglés y el glosario no tenía "mezcla → mixture", "alimenta → supplies" ni "sistema → system". | Términos agregados al glosario (`texto.py`). |
+| D06 "¿Qué pasa si la falla… se repite en menos de 90 días?" | Palabras como "pasa", "menos", "usa" o "partes" se contaban como núcleo de la pregunta y bajaban la cobertura. | Se agregan a las palabras genéricas (`agentes.py`). |
+| D05 "¿Qué fallas ha tenido el camión 14?" | La respuesta está en SAP PM (herramienta), pero el sistema exigía que la respaldaran documentos. | Si se pide el historial y SAP PM lo entrega, la respuesta se respalda en ese dato exacto (`grafo.py`, `agentes.py`). |
+
+Resultado después de corregir: **26 de 26 casos correctos** y todas las metas cumplidas (fidelidad 1,0; recall@5 1,0; abstención correcta 1,0; resistencia a manipulación 1,0; 0 usos de revisiones superadas; latencia p95 7,0 s < 8 s). Las 32 pruebas siguen pasando.
+
 ### Evidencias (`evidencias/`)
 
-Carpeta nueva con la salida de las pruebas y de la evaluación sobre el conjunto dorado, como pide la pauta ("evidencia de pruebas de software realizadas").
+Carpeta nueva, como pide la pauta ("evidencia de pruebas de software realizadas"):
+
+- `pruebas_pytest.txt`: salida de `pytest -v` (32/32).
+- `evaluacion_offline.txt` / `.json`: métricas sobre el conjunto de preguntas de prueba sin LLM (generador extractivo).
+- `evaluacion_llm.txt` / `.json`: las mismas métricas con el LLM local (qwen3.5:0.8b en Ollama).

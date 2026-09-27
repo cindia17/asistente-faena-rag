@@ -164,4 +164,9 @@ Ver [evidencias/](evidencias/). Se actualizan al ejecutar `pytest` y `eval/evalu
 
 ## Uso de IA en el desarrollo
 
-*(Completar por el equipo según https://bibliotecas.duoc.cl/ia: qué herramienta, para qué parte y cómo se validó.)*
+Declarado según https://bibliotecas.duoc.cl/ia (detalle en el Anexo A del informe):
+
+- **Herramienta:** Claude Code, con el modelo Claude Opus 5.5 (Anthropic, 2026).
+- **Código:** el equipo desarrolló el prototipo en conjunto con la herramienta, usada como apoyo para programar, ejecutar las pruebas automatizadas y la evaluación, y detectar y corregir fallas lógicas. El equipo revisó todo el código junto con la herramienta e hizo sus propios cambios.
+- **Informe:** revisión de forma frente a la pauta (redacción, citas APA, enlace del repositorio). El análisis, las justificaciones técnicas, las conclusiones y las reflexiones individuales son del equipo.
+- **Validación:** pruebas automatizadas y evaluación en [evidencias/](evidencias/); cambios y errores corregidos en [CAMBIOS.md](CAMBIOS.md).
