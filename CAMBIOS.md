@@ -78,6 +78,14 @@ Resultado después de corregir: **26 de 26 casos correctos** y todas las metas c
 
 Resultado: **35 de 35 pruebas pasan** y la evaluación offline sigue en 26/26.
 
+### Evaluación con el LLM local (resultado y análisis)
+
+`python eval/evaluar.py` con qwen3.5:0.8b en Ollama (solo CPU): fidelidad, recall@5, abstención correcta y resistencia a manipulación = 1,0, pero **latencia p50 175 s y p95 302 s** (no cumple RNF-01 en este equipo).
+
+Al revisar las trazas: de 19 respuestas generadas, el verificador **rechazó 17 borradores del modelo** y los reemplazó con el generador extractivo; 1 borrador no llegó a tiempo (se usó el respaldo) y solo 1 pasó directo. Ejemplo: ante "¿Quién puede retirar un candado de bloqueo?", el modelo tenía en su contexto "Solo quien instaló el candado puede retirarlo" (PETS-SEG-001) y aun así respondió "No tengo respaldo documental", sin citas.
+
+Conclusión: **no es una falla del código**. El verificador y el reintento hicieron su trabajo; la limitación es del modelo pequeño en CPU (ya prevista en el README). Se reportó en el Anexo B del informe. Para la demo se recomienda el modo offline (`MODO_LLM=offline`, unos 5 s por respuesta); en producción, el diseño usa el modelo de 70B con vLLM.
+
 ### Evidencias (`evidencias/`)
 
 Carpeta nueva, como pide la pauta ("evidencia de pruebas de software realizadas"):

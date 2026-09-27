@@ -42,6 +42,8 @@ python eval/evaluar.py --offline     # métricas sobre el conjunto dorado (sin L
 python eval/evaluar.py               # métricas con el LLM local
 ```
 
+> **Para la demo en un equipo sin GPU**, se recomienda el modo offline: `$env:MODO_LLM="offline"` antes de `streamlit run app.py` (respuestas en unos 5 s). Con el modelo pequeño en CPU cada respuesta tarda minutos y el verificador rechaza la mayoría de sus borradores (ver `evidencias/evaluacion_llm.txt` y CAMBIOS.md).
+
 Sin Ollama, el sistema funciona igual en **modo offline**: usa un embedder de respaldo y un generador extractivo que responde con oraciones literales de los documentos.
 
 ### Variables de entorno
