@@ -147,6 +147,7 @@ entrada → reescritura → clasificación ─┬─> reporte (borrador; registr
 ├── evidencias/                   Resultados de pruebas y evaluación
 ├── docs/                         Diagramas y bocetos
 ├── informe/                      Informe técnico
+├── CAMBIOS.md                    Registro de cambios y errores corregidos
 └── presentacion/                 Presentación de la defensa
 ```
 
