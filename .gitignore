@@ -1,3 +1,8 @@
+# Secretos locales (API keys): nunca se suben al repositorio
+.env
+.env.*
+!.env.example
+
 # Entorno y caches de Python
 .venv/
 venv/
