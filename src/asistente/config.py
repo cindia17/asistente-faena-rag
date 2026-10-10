@@ -6,9 +6,30 @@ top-k) quede en un solo lugar y sea trazable en el control de versiones.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
+
+
+def cargar_env(archivo: Path = RAIZ / ".env") -> bool:
+    """Carga las variables del archivo .env de la raíz del proyecto, si existe.
+
+    - Las variables ya definidas en la terminal tienen prioridad (override=False).
+    - Durante pytest no se carga, para que las pruebas no dependan de la configuración
+      local ni envíen trazas a LangSmith.
+    - python-dotenv es opcional: sin el paquete el asistente funciona igual.
+    """
+    if "pytest" in sys.modules or not archivo.is_file():
+        return False
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return False
+    return load_dotenv(archivo, override=False)
+
+
+ENV_CARGADO = cargar_env()
 DIR_CORPUS = RAIZ / "data" / "corpus"
 DIR_INDICE = RAIZ / "data" / "indice"
 ARCHIVO_SAP = RAIZ / "data" / "sap_pm_mock.json"

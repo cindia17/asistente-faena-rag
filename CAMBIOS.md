@@ -4,6 +4,61 @@ Qué se cambió en el proyecto, por qué y en qué archivos. El equipo (Cindia M
 
 ---
 
+## 2026-10-09
+
+### Configuración con archivo `.env`
+
+Hasta ahora toda la configuración tenía valores por defecto en `config.py` y se cambiaba con variables de la terminal. Con LangSmith aparece el primer secreto del proyecto (la API key), y escribirla en cada terminal es incómodo. Se agrega soporte para un archivo `.env`, cuidando que la clave no termine en el repositorio.
+
+| Archivo | Cambio |
+|---|---|
+| `.gitignore` | Excluye `.env` (y variantes), salvo la plantilla `.env.example` |
+| `.env.example` | Plantilla sin secretos con las variables de LangSmith y del modo de ejecución |
+| `requirements.txt` | Agrega `python-dotenv` |
+| `src/asistente/config.py` | `cargar_env()`: lee el `.env` al iniciar sin pisar las variables de la terminal; no se carga durante `pytest`; si falta `python-dotenv`, el asistente funciona igual |
+| `src/asistente/observabilidad.py` | Importa `config` para que el `.env` esté cargado antes de leer las variables de LangSmith |
+| `README.md` | Cómo usar el `.env` |
+
+---
+
+## 2026-10-03
+
+### Métricas por respuesta y observabilidad con LangSmith
+
+Se agregan métricas de **rendimiento** (tiempo total, recuperación, generación y documentos recuperados) y de **calidad** (fidelidad, relevancia y precisión del contexto) en **cada respuesta**, y la integración con **LangSmith** para observabilidad, monitoreo y evaluación.
+
+| Archivo | Cambio |
+|---|---|
+| `src/asistente/metricas.py` (nuevo) | Calcula las métricas de cada respuesta. Fidelidad: la del Verificador. Relevancia: conceptos núcleo de la pregunta presentes en la respuesta (con bge-m3 se complementa con similitud semántica). Precisión del contexto: fórmula de RAGAS (promedio de precision@k en las posiciones útiles). |
+| `src/asistente/observabilidad.py` (nuevo) | Integración opcional con LangSmith: traza por consulta (grafo de LangGraph, recuperación como *retriever*, LLM, SAP PM y verificador), métricas como *feedback* y filtros de lo que se envía. Solo se activa con `LANGSMITH_TRACING=true` y `LANGSMITH_API_KEY`. |
+| `src/asistente/grafo.py` | `consultar` devuelve `metricas` y `traza_langsmith`; las métricas quedan también en la traza JSONL. |
+| `src/asistente/recuperacion.py`, `llm.py`, `verificador.py`, `herramientas.py` | Cada paso queda trazado en LangSmith (sin efecto si está desactivado). |
+| `app.py` | Tarjetas de rendimiento y calidad bajo cada respuesta, promedios y gráfico de tiempos en el panel de supervisor, estado de LangSmith en la barra lateral. |
+| `src/asistente/cli.py` | `--detalle` muestra las métricas y el id de la traza. |
+| `eval/evaluadores.py` (nuevo) | Evaluadores compartidos por la evaluación local y la de LangSmith, para que ambas midan lo mismo. |
+| `eval/evaluar_langsmith.py` (nuevo) | Sube el conjunto dorado como dataset y crea experimentos en LangSmith. Con `--local` imprime la tabla de métricas por respuesta sin enviar nada. |
+| `eval/evaluar.py` | Informa además relevancia, precisión del contexto, tiempos de recuperación y generación y documentos recuperados (informativas, sin meta: el criterio de aprobación no cambia). |
+| `tests/test_metricas.py` (nuevo) | 15 pruebas: fórmula de la precisión del contexto, relevancia, métricas en cada respuesta y en la abstención, feedback y privacidad. |
+| `requirements.txt` | Se agrega `langsmith`. |
+
+### Falla de privacidad detectada al integrar LangSmith y cómo se corrigió
+
+| Qué pasaba | Causa | Corrección |
+|---|---|---|
+| Al activar LangSmith, el **token SSO** y la memoria de la sesión se habrían enviado en cada traza. | LangGraph registra el estado completo del grafo, y el token y la memoria viajaban en ese estado. El nombre de usuario también. | El estado solo lleva un id de sesión opaco; el token y la memoria quedan en memoria del proceso mientras dura la consulta (`AsistenteFaena._sesiones`). El usuario va seudonimizado desde el primer nodo y la herramienta de SAP no envía el token. Prueba: `test_el_token_no_entra_al_estado_del_grafo`. |
+
+### Ajuste de la métrica de relevancia
+
+La primera versión contaba verbos auxiliares ("¿cuáles **son** los pasos…?", "¿qué accidentes **han** ocurrido…?") como conceptos de la pregunta y bajaba el puntaje sin motivo. Se excluyen. La relevancia léxica sigue sin reconocer paráfrasis ("capacitación" / "instrucción"): con bge-m3 se complementa con similitud semántica, igual que el Verificador.
+
+### Verificación
+
+Las 50 pruebas (35 anteriores + 15 nuevas) pasaron en un entorno de desarrollo sin acceso a PyPI, con sustitutos locales de `langgraph`, `rank-bm25` y `pytest` y el embedder de respaldo. La integración con LangSmith se comprobó con un SDK simulado (qué se envía, que el token no sale y que el feedback llega a la traza correcta), no contra el servicio real.
+
+**Pendiente en el equipo del proyecto:** `pytest -v`, `python eval/evaluar.py --offline` con Ollama (bge-m3), y una corrida con LangSmith activo para confirmar las trazas y el experimento en la interfaz.
+
+---
+
 ## 2026-09-27
 
 ### Informe (`informe/Informe Chuquicamata (corregido).docx`)

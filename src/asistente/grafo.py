@@ -9,6 +9,11 @@
 
 El grafo explícito hace que el flujo sea auditable: cada nodo deja su huella en
 la traza y los reintentos tienen un límite fijo.
+
+Privacidad de la traza: el token SSO y la memoria de la sesión NO viajan en el
+estado del grafo (que LangSmith registra completo). El estado solo lleva un id
+de sesión opaco; el token y la memoria quedan en `self._sesiones` mientras dura
+la consulta.
 """
 from __future__ import annotations
 
@@ -21,7 +26,7 @@ from typing import Any, TypedDict
 import requests
 from langgraph.graph import END, START, StateGraph
 
-from . import config, trazas
+from . import config, metricas, observabilidad, trazas
 from .agentes import (MENSAJE_BIENVENIDA, NOTA_SUPERVISOR, TIPOS_POR_AGENTE, borrador_reporte, clasificar_intencion,
                       evaluar_respondibilidad, generar_con_llm, generar_extractivo, mensaje_abstencion,
                       implica_intervencion, pide_historial)
@@ -38,9 +43,8 @@ from .verificador import Verificador
 
 class Estado(TypedDict, total=False):
     pregunta: str
-    token: str
-    memoria: MemoriaSesion
-    usuario: dict
+    sesion: str            # id opaco; el token y la memoria quedan fuera del estado
+    usuario: dict          # seudónimo y rol, nunca el nombre ni el token
     pregunta_limpia: str
     intento_manipulacion: bool
     consulta: str
@@ -75,6 +79,8 @@ class AsistenteFaena:
         self.recuperador = RecuperadorHibrido(fragmentos, matriz, self.embedder)
         self.verificador = Verificador(self.embedder, self.llm)
         self.grafo = self._construir_grafo()
+        self._sesiones: dict[str, dict] = {}   # id de sesión -> {"token", "memoria"} durante la consulta
+        self.enviar_feedback = True            # métricas como feedback en LangSmith (si está activo)
 
     # ---------------------------------------------------------------- nodos
     def _medir(self, estado: Estado, etapa: str, inicio: float) -> dict:
@@ -82,9 +88,16 @@ class AsistenteFaena:
         tiempos[etapa] = round(time.perf_counter() - inicio, 3)
         return tiempos
 
+    def _token(self, e: Estado) -> str:
+        return self._sesiones[e["sesion"]]["token"]
+
+    def _memoria(self, e: Estado) -> MemoriaSesion:
+        return self._sesiones[e["sesion"]]["memoria"]
+
     def n_entrada(self, e: Estado) -> dict:
         t0 = time.perf_counter()
-        usuario = autenticar(e["token"])               # SSO simulado: sin token válido no hay consulta
+        u = autenticar(self._token(e))                 # SSO simulado: sin token válido no hay consulta
+        usuario = {"usuario": trazas.seudonimo(u["usuario"]), "rol": u["rol"]}
         g = revisar_entrada(e["pregunta"])
         avisos = []
         if g["intento_manipulacion"]:
@@ -95,7 +108,7 @@ class AsistenteFaena:
 
     def n_reescritura(self, e: Estado) -> dict:
         t0 = time.perf_counter()
-        r = reescribir_consulta(e["pregunta_limpia"], e["memoria"])
+        r = reescribir_consulta(e["pregunta_limpia"], self._memoria(e))
         return {**r, "tiempos": self._medir(e, "reescritura", t0)}
 
     def n_clasificacion(self, e: Estado) -> dict:
@@ -129,7 +142,7 @@ class AsistenteFaena:
         historial, avisos = None, list(e.get("avisos", []))
         if e.get("equipo") and intencion in ("mantenimiento", "mixta"):
             try:
-                historial = consultar_historial(e["token"], e["equipo"])
+                historial = consultar_historial(self._token(e), e["equipo"])
             except PermisoDenegado as err:
                 avisos.append(f"Atención: no se consultó el historial de {e['equipo']}: {err}")
         respondibilidad = evaluar_respondibilidad(e["pregunta_limpia"], fragmentos)
@@ -149,7 +162,7 @@ class AsistenteFaena:
         if self.llm is not None and e.get("intentos", 0) == 0:
             try:
                 borrador = generar_con_llm(self.llm, e["intencion"], e["pregunta_limpia"], e["fragmentos"],
-                                           e.get("historial"), e["memoria"].como_texto())
+                                           e.get("historial"), self._memoria(e).como_texto())
                 generador = f"llm:{self.llm.modelo}"
             except requests.RequestException:
                 # RNF-03: si el modelo no responde (caído o saturado), la consulta no se
@@ -225,18 +238,39 @@ class AsistenteFaena:
 
     # ---------------------------------------------------------------- API
     def consultar(self, pregunta: str, token: str, memoria: MemoriaSesion | None = None) -> dict:
+        """Responde una consulta. Si LangSmith está activo, la deja trazada con sus métricas."""
         memoria = memoria if memoria is not None else MemoriaSesion()
+        run_id = uuid.uuid4()
+        with observabilidad.contexto_traza():
+            resultado = observabilidad.ejecutar(
+                self._consultar, pregunta, token, memoria, run_id=run_id,
+                metadata={"embedder": self.embedder.nombre, "umbral_abstencion": config.UMBRAL_ABSTENCION,
+                          "generador_disponible": f"llm:{self.llm.modelo}" if self.llm else "extractivo"})
+        if resultado.get("id"):
+            resultado["traza_langsmith"] = str(run_id) if observabilidad.activa() else None
+            if self.enviar_feedback:
+                observabilidad.enviar_feedback(run_id, resultado["metricas"], resultado["abstencion"])
+        return resultado
+
+    @observabilidad.trazar("asistente_faena", entradas=observabilidad.entradas_consulta,
+                           salidas=observabilidad.salidas_consulta)
+    def _consultar(self, pregunta: str, token: str, memoria: MemoriaSesion) -> dict:
         t0 = time.perf_counter()
+        sesion = uuid.uuid4().hex
+        self._sesiones[sesion] = {"token": token, "memoria": memoria}
         try:
-            e = self.grafo.invoke({"pregunta": pregunta, "token": token, "memoria": memoria})
+            e = self.grafo.invoke({"pregunta": pregunta, "sesion": sesion})
         except PermisoDenegado as err:
             return {"respuesta": f"Acceso denegado: {err}", "abstencion": True, "citas": [], "id": None}
+        finally:
+            self._sesiones.pop(sesion, None)
         total = round(time.perf_counter() - t0, 3)
         memoria.agregar(e.get("pregunta_limpia", pregunta), e["respuesta"], e.get("equipo"))
+        tiempos = dict(e.get("tiempos", {}), total=total)
         resultado = {
             "id": uuid.uuid4().hex[:12],
             "fecha": datetime.now().isoformat(timespec="seconds"),
-            "usuario": trazas.seudonimo(e["usuario"]["usuario"]),
+            "usuario": e["usuario"]["usuario"],          # ya viene seudonimizado desde n_entrada
             "rol": e["usuario"]["rol"],
             "pregunta": e["pregunta_limpia"],
             "consulta_reescrita": e.get("consulta"),
@@ -256,7 +290,11 @@ class AsistenteFaena:
             "respuesta": e["respuesta"],
             "citas": e.get("citas", []),
             "reporte_borrador": e.get("reporte_borrador"),
-            "tiempos": dict(e.get("tiempos", {}), total=total),
+            "tiempos": tiempos,
+            "metricas": metricas.calcular(
+                pregunta=e.get("pregunta_limpia", pregunta), respuesta=e["respuesta"], tiempos=tiempos,
+                fragmentos=e.get("fragmentos"), verificacion=e.get("verificacion"),
+                abstencion=e.get("abstencion", False), embedder=self.embedder),
             "embedder": self.embedder.nombre,
         }
         trazas.registrar(resultado)

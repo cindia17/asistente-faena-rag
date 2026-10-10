@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from rank_bm25 import BM25Okapi
 
-from . import config
+from . import config, observabilidad
 from .texto import cobertura, tokenizar
 
 BONO_PRIORIDAD = {"alta": 0.05, "media": 0.0, "baja": -0.05}
@@ -87,6 +87,9 @@ class RecuperadorHibrido:
             salida.append((i, puntaje, semantica, cob))
         return sorted(salida, key=lambda t: -t[1])
 
+    @observabilidad.trazar("recuperacion_hibrida", tipo="retriever",
+                           entradas=observabilidad.entradas_recuperacion,
+                           salidas=observabilidad.salidas_recuperacion)
     def buscar(self, consulta: str, tipos: set[str] | None = None, equipo_tipo: str | None = None,
                top_k: int = config.TOP_K) -> ResultadoRecuperacion:
         permitidos = self._filtrar(tipos, equipo_tipo)

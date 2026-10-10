@@ -6,6 +6,10 @@ Pestañas:
   - Asistente: chat con respuesta, citas, fragmentos recuperados y veredicto del verificador
     (sirve para demostrar IE6: relación entre datos recuperados y respuesta).
   - Panel de supervisor: trazas y consultas sin respaldo (backlog de curaduría documental).
+
+Cada respuesta muestra sus métricas de rendimiento (tiempo total, recuperación,
+generación y documentos recuperados) y de calidad (fidelidad, relevancia y precisión
+del contexto). Con LangSmith activo, la traza completa queda en el proyecto configurado.
 """
 from __future__ import annotations
 
@@ -17,7 +21,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from asistente import trazas  # noqa: E402
+from asistente import observabilidad, trazas  # noqa: E402
 from asistente.contexto import MemoriaSesion  # noqa: E402
 from asistente.grafo import AsistenteFaena  # noqa: E402
 from asistente.herramientas import registrar_reporte  # noqa: E402
@@ -39,6 +43,45 @@ EJEMPLOS = [
 ]
 
 
+AYUDA = {
+    "Fidelidad": "Afirmaciones de la respuesta respaldadas por el fragmento que citan (Verificador).",
+    "Relevancia": "Conceptos de la pregunta que la respuesta aborda.",
+    "Precisión del contexto": "Si los fragmentos que la respuesta usa quedaron arriba en el ranking (fórmula de RAGAS).",
+    "Docs recuperados": "Fragmentos que llegan al generador tras el reranking (top-k).",
+}
+
+
+def fmt_s(v) -> str:
+    if v is None:
+        return "—"
+    return f"{v * 1000:.0f} ms" if v < 0.1 else f"{v:.2f} s"
+
+
+def fmt_p(v) -> str:
+    return "—" if v is None else f"{v:.0%}"
+
+
+def mostrar_metricas(r: dict) -> None:
+    m = r.get("metricas")
+    if not m or r.get("intencion") in ("saludo", "reporte"):
+        return
+    rend, cal = m["rendimiento"], m["calidad"]
+    st.caption("**Rendimiento**")
+    c = st.columns(4)
+    c[0].metric("Tiempo total", fmt_s(rend["tiempo_total_s"]))
+    c[1].metric("Recuperación", fmt_s(rend["tiempo_recuperacion_s"]))
+    c[2].metric("Generación", fmt_s(rend["tiempo_generacion_s"]))
+    c[3].metric("Docs recuperados", rend["docs_recuperados"],
+                help=f"{AYUDA['Docs recuperados']} De {rend['documentos_unicos']} documentos distintos.")
+    st.caption("**Calidad**" + (" · no aplica: el asistente se abstuvo" if r["abstencion"] else ""))
+    c = st.columns(3)
+    for col, (nombre, clave) in zip(c, [("Fidelidad", "fidelidad"), ("Relevancia", "relevancia"),
+                                        ("Precisión del contexto", "precision_contexto")]):
+        col.metric(nombre, fmt_p(cal[clave]), help=AYUDA[nombre])
+    if r.get("traza_langsmith"):
+        st.caption(f"Traza en LangSmith · proyecto `{observabilidad.proyecto()}` · id `{r['traza_langsmith']}`")
+
+
 @st.cache_resource(show_spinner="Cargando índices y modelos locales...")
 def cargar_asistente() -> AsistenteFaena:
     return AsistenteFaena()
@@ -54,7 +97,8 @@ with st.sidebar:
     if st.session_state.get("perfil") != perfil:
         st.session_state.update(perfil=perfil, memoria=MemoriaSesion(), chat=[])
     st.markdown(f"**Embeddings:** `{asistente.embedder.nombre}`  \n"
-                f"**Generador:** `{('llm:' + asistente.llm.modelo) if asistente.llm else 'extractivo (offline)'}`")
+                f"**Generador:** `{('llm:' + asistente.llm.modelo) if asistente.llm else 'extractivo (offline)'}`  \n"
+                f"**LangSmith:** {observabilidad.estado()}")
     if st.button("Nueva conversación"):
         st.session_state.update(memoria=MemoriaSesion(), chat=[])
     st.divider()
@@ -75,6 +119,7 @@ with tab_chat:
                 "Se abstuvo y derivó a una persona" if r["abstencion"] else
                 f"Verificación: {(r.get('verificacion') or {}).get('veredicto', '—')}")
             st.markdown(r["respuesta"].replace("\n", "  \n"))
+            mostrar_metricas(r)
             with st.expander("¿De dónde salió esta respuesta? (fragmentos, verificador y traza)"):
                 c1, c2 = st.columns(2)
                 with c1:
@@ -118,6 +163,26 @@ with tab_panel:
             c2.metric("Abstenciones", int(df["abstencion"].sum()))
             c3.metric("Intentos de manipulación", int(df["intento_manipulacion"].sum()))
             c4.metric("Latencia media (s)", round(df["tiempos"].apply(lambda t: t["total"]).mean(), 2))
+            filas_m = [dict(t["metricas"]["rendimiento"], **t["metricas"]["calidad"], fecha=t["fecha"])
+                       for t in datos if t.get("metricas")]
+            if filas_m:
+                dm = pd.DataFrame(filas_m)
+                medias = {k: pd.to_numeric(dm[k], errors="coerce").mean() for k in dm.columns if k != "fecha"}
+                prom = {k: (None if pd.isna(v) else float(v)) for k, v in medias.items()}
+                st.subheader("Métricas promedio por respuesta")
+                st.caption("Rendimiento")
+                c = st.columns(4)
+                c[0].metric("Tiempo total", fmt_s(prom["tiempo_total_s"]))
+                c[1].metric("Recuperación", fmt_s(prom["tiempo_recuperacion_s"]))
+                c[2].metric("Generación", fmt_s(prom["tiempo_generacion_s"]))
+                c[3].metric("Docs recuperados", "—" if prom["docs_recuperados"] is None else f"{prom['docs_recuperados']:.1f}")
+                st.caption("Calidad (solo respuestas entregadas)")
+                c = st.columns(3)
+                for col, (nombre, clave) in zip(c, [("Fidelidad", "fidelidad"), ("Relevancia", "relevancia"),
+                                                    ("Precisión del contexto", "precision_contexto")]):
+                    col.metric(nombre, fmt_p(prom[clave]), help=AYUDA[nombre])
+                st.caption("Tiempo por consulta (s)")
+                st.line_chart(dm[["tiempo_total_s", "tiempo_recuperacion_s", "tiempo_generacion_s"]])
             st.subheader("Consultas sin respaldo (backlog de curaduría documental)")
             st.dataframe(df[df["abstencion"]][["fecha", "rol", "pregunta", "motivo_abstencion"]], hide_index=True)
             st.subheader("Todas las trazas")

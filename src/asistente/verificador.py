@@ -19,6 +19,7 @@ import re
 
 import numpy as np
 
+from . import observabilidad
 from .config import FRASE_ABSTENCION
 from .prompts import PLANTILLA_VERIFICADOR, PROMPT_VERIFICADOR, cita, formatear_fragmento
 from .texto import GLOSARIO_ES_EN, tokenizar
@@ -66,6 +67,7 @@ class Verificador:
             fuentes[clave] = f"{o['ot']} {o['fecha']} {o['sintoma']} {o['causa']} {o['accion']} {o['horas_detencion']}"
         return fuentes
 
+    @observabilidad.trazar("verificador", entradas=observabilidad.entradas_verificador)
     def verificar(self, respuesta: str, fragmentos: list[dict], historial: dict | None = None) -> dict:
         fuentes = self._fuentes(fragmentos, historial)
         afirmaciones = extraer_afirmaciones(respuesta)

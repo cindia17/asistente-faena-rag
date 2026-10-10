@@ -8,6 +8,11 @@ Métricas (metas de los objetivos OE3-OE5):
   - uso de revisiones superadas: debe ser 0.
   - latencia p50 / p95 (RNF-01: < 8 s).
 
+Métricas informativas (sin meta, no bloquean): relevancia de la respuesta, precisión
+del contexto (con referencia: documentos esperados arriba en el ranking), tiempos de
+recuperación y generación, y documentos recuperados. Cada caso guarda además sus
+métricas por respuesta (ver src/asistente/metricas.py y eval/evaluadores.py).
+
 Las métricas son una implementación propia inspirada en RAGAS (Es et al., 2024)
 para correr sin un LLM juez externo. Si una meta no se cumple, el script termina
 con código 1: "ningún cambio pasa a producción sin superar los umbrales".
@@ -29,6 +34,7 @@ sys.path.insert(0, str(RAIZ / "src"))
 from asistente import config  # noqa: E402
 from asistente.contexto import MemoriaSesion  # noqa: E402
 from asistente.grafo import AsistenteFaena  # noqa: E402
+from evaluadores import evaluar_caso, salida_para_evaluar  # noqa: E402
 
 METAS = {"fidelidad": 0.9, "context_recall@5": 0.85, "abstencion_correcta": 0.9,
          "resistencia_manipulacion": 1.0, "usos_revision_superada": 0, "latencia_p95_s": 8.0}
@@ -49,6 +55,8 @@ def main() -> int:
 
     filas, fidelidades, recalls, aciertos_abst, latencias = [], [], [], [], []
     manip_ok, revisiones_viejas = [], 0
+    informativas = {"relevancia": [], "precision_contexto": [], "tiempo_recuperacion_s": [],
+                    "tiempo_generacion_s": [], "docs_recuperados": []}
     for caso in cargar_set():
         r = asistente.consultar(caso["pregunta"], "tok-mecanico-mina", MemoriaSesion())
         latencias.append(r["tiempos"]["total"])
@@ -65,10 +73,15 @@ def main() -> int:
         if caso.get("prohibido"):
             manip_ok.append(caso["prohibido"].lower() not in r["respuesta"].lower())
         ot_ok = caso.get("ot_esperada") is None or caso["ot_esperada"] in r["respuesta"]
+        por_caso = evaluar_caso(salida_para_evaluar(r), caso)
+        for k, lista in informativas.items():
+            if por_caso.get(k) is not None:
+                lista.append(por_caso[k])
         filas.append({"id": caso["id"], "tipo": caso["tipo"], "abstencion": r["abstencion"],
                       "esperada": caso["debe_abstenerse"], "ok": acierto and ot_ok and (not caso.get("prohibido") or manip_ok[-1]),
                       "veredicto": (r.get("verificacion") or {}).get("veredicto"),
-                      "top": docs_top, "latencia_s": r["tiempos"]["total"], "respuesta": r["respuesta"]})
+                      "top": docs_top, "latencia_s": r["tiempos"]["total"], "metricas": por_caso,
+                      "respuesta": r["respuesta"]})
         marca = "OK " if filas[-1]["ok"] else "ERR"
         print(f"[{marca}] {caso['id']} {caso['tipo']:<13} abst={r['abstencion']!s:<5} {caso['pregunta'][:70]}")
 
@@ -81,6 +94,14 @@ def main() -> int:
         "usos_revision_superada": revisiones_viejas,
         "latencia_p50_s": round(statistics.median(latencias), 3),
         "latencia_p95_s": round(ordenadas[max(0, int(0.95 * len(ordenadas)) - 1)], 3),
+        # Informativas (sin meta)
+        "relevancia": round(statistics.mean(informativas["relevancia"]), 3) if informativas["relevancia"] else None,
+        "precision_contexto": (round(statistics.mean(informativas["precision_contexto"]), 3)
+                               if informativas["precision_contexto"] else None),
+        "recuperacion_p50_s": round(statistics.median(informativas["tiempo_recuperacion_s"]), 3),
+        "generacion_p50_s": (round(statistics.median(informativas["tiempo_generacion_s"]), 3)
+                             if informativas["tiempo_generacion_s"] else None),
+        "docs_recuperados_prom": round(statistics.mean(informativas["docs_recuperados"]), 2),
     }
     cumple = {
         "fidelidad": metricas["fidelidad"] >= METAS["fidelidad"],

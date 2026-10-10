@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta
 
-from . import config
+from . import config, observabilidad
 
 
 class PermisoDenegado(Exception):
@@ -31,6 +31,7 @@ def autenticar(token: str) -> dict:
     return dict(usuario, permisos=datos["permisos_por_rol"][usuario["rol"]])
 
 
+@observabilidad.trazar("sap_pm.consultar_historial", tipo="tool", entradas=observabilidad.entradas_historial)
 def consultar_historial(token: str, equipo: str, meses: int = 24, hoy: date | None = None) -> dict:
     """Historial de órdenes de trabajo de un equipo en los últimos `meses`."""
     usuario = autenticar(token)

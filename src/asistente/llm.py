@@ -11,7 +11,7 @@ import re
 
 import requests
 
-from . import config
+from . import config, observabilidad
 from .embeddings import ollama_disponible
 
 
@@ -19,6 +19,9 @@ class OllamaLLM:
     def __init__(self, modelo: str = config.MODELO_GENERADOR):
         self.modelo = modelo
 
+    @observabilidad.trazar("ollama_chat", tipo="llm", entradas=observabilidad.entradas_llm,
+                           salidas=observabilidad.salidas_llm,
+                           metadata={"ls_provider": "ollama", "ls_model_name": config.MODELO_GENERADOR})
     def chat(self, sistema: str, usuario: str, formato_json: bool = False) -> str:
         cuerpo = {
             "model": self.modelo,
